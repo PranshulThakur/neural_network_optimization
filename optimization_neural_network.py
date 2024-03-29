@@ -5,6 +5,8 @@ from train_objfunc import get_trained_objfunc
 from constraints import constraint_1, constraint_2
 from objective_function import obj_func
 
+# Modified implementation of: Chen J, Liu Y. 2023 Neural optimization machine: a neural network approach for optimization and its application in additive manufacturing with physics-guided learning. Phil. Trans. R. Soc. A.
+
 # Define the neural network for optimization problem
 class Net_optimizationproblem(torch.nn.Module):
     def __init__(self,f_neural_net, constraint):
@@ -24,14 +26,13 @@ class Net_optimizationproblem(torch.nn.Module):
 
         x = self.linear(x);
         f_val = self.f_neural_net(x).squeeze();
-        #f_val = obj_func(x);
+        #f_val = obj_func(x); # Can also use the analytical objective function.
         constraints_val = self.constraint(x); 
 
         output = f_val + 10*(torch.relu(constraints_val) + torch.relu(-constraints_val));
-        #output = f_val + 5.0*(torch.tanh((constraints_val/2.0)))**2;
         return output;
 
-#Custom loss function for optimization
+#Custom loss function for optimization.
 class CustomLoss(torch.nn.Module):
     def __init__(self):
         super(CustomLoss, self).__init__()
@@ -39,44 +40,51 @@ class CustomLoss(torch.nn.Module):
     def forward(self, predictions):
         return predictions;
 
-objfunc_neural_net = get_trained_objfunc();
 
-optimization_problem = Net_optimizationproblem(objfunc_neural_net, constraint_1);
-loss_function = CustomLoss()
-optimizer = torch.optim.NAdam(optimization_problem.parameters(), lr=0.01)  # Using Adam optimizer
+def run_optimizer(objfunc_neural_net, constraint):
+    optimization_problem = Net_optimizationproblem(objfunc_neural_net, constraint);
+    loss_function = CustomLoss()
+    optimizer = torch.optim.NAdam(optimization_problem.parameters(), lr=0.01);
+
+    x_initial = torch.Tensor(1,2);
+    x_initial[:,0] = 0.5;
+    x_initial[:,1] = 0.5;
+    for epoch in range(10000):
+        optimizer.zero_grad()
+        outputs = optimization_problem(x_initial)
+        loss = loss_function(outputs)
+        loss.backward() # Backward propagation with automatic differentiation.
+        optimizer.step()
+        if epoch % 1000 == 0:
+            print("Epoch {}: Loss = {}".format(epoch, loss.detach().numpy()))
+
+    x_optimal = optimization_problem.linear(x_initial);
+    print("Optimal point = ", x_optimal);
+    return x_optimal;
 
 
-print("Running optimization using neural network..");
 
-x_initial = torch.Tensor(1,2);
-x_initial[:,0] = 0.5;
-x_initial[:,1] = 0.5;
-print(x_initial.size());
-for epoch in range(10000):
-    running_loss = 0.0
-    optimizer.zero_grad()
-    outputs = optimization_problem(x_initial)
-    loss = loss_function(outputs)
-    loss.backward()
-    optimizer.step()
-    running_loss += loss.item()
+print("===================================================================");
+print("                 Training NN objective function                       ");
+print("===================================================================");
+objfunc_neuralnet = get_trained_objfunc();
+print("===================================================================");
+print('\n\n');
+print("===================================================================");
+print("                 Optimization using Neural Network                 ");
+print("===================================================================");
+print('\n');
+print("===================================================================");
+print("Running optimization for f(x,y) = (1-x)^2 + 100*(y-x^2)^2");
+print("With constraint c1(x,y) = 1-x-y = 0");
+print("===================================================================");
+run_optimizer(objfunc_neuralnet, constraint_1);
+print("===================================================================");
+print('\n\n');
+print("===================================================================");
+print("Running optimization for f(x,y) = (1-x)^2 + 100*(y-x^2)^2");
+print("With constraint c2(x,y) = 1-x^2-y^2 = 0");
+print("===================================================================");
+run_optimizer(objfunc_neuralnet, constraint_2);
+print("===================================================================");
 
-    if epoch % 100 == 0:
-        print("Epoch {}: Loss = {}".format(epoch, loss.detach().numpy()))
-
-print("Optimal point = ");
-x_optimal = optimization_problem.linear(x_initial);
-print(x_optimal);
-"""
-# Plot the actual function and predicted function
-x_plot,y_plot = np.meshgrid(x_1d,x_1d);
-actual_z = f_exact.squeeze();
-predicted_z = f_neural_net(xy_tensor).squeeze();
-actual_z = torch.reshape(actual_z, (n_samples_1d,n_samples_1d));
-predicted_z = torch.reshape(predicted_z, (n_samples_1d,n_samples_1d));
-
-fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
-ax.plot_surface(x_plot,y_plot,actual_z);
-ax.plot_surface(x_plot,y_plot,predicted_z.detach().numpy());
-plt.show()
-"""
