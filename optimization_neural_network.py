@@ -16,14 +16,11 @@ class Net_optimizationproblem(torch.nn.Module):
             param.requires_grad = False;
         self.constraint = constraint;
         self.linear = torch.nn.Linear(2,2);
-        torch.nn.init.zeros_(self.linear.weight);
+        torch.nn.init.eye_(self.linear.weight);
         torch.nn.init.zeros_(self.linear.bias);
 
 
     def forward(self, x):
-        with torch.no_grad():
-            self.linear.weight.data.copy_(torch.eye(2));
-
         x = self.linear(x);
         f_val = self.f_neural_net(x).squeeze();
         #f_val = obj_func(x); # Can also use the analytical objective function.
